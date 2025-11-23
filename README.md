@@ -134,13 +134,80 @@ server {
 }
 ```
 
-## Security Considerations
+## Security & Privacy Disclosure
 
-- Always use HTTPS in production
-- Change `JWT_SECRET` to a strong random string
-- Configure proper `CORS_ORIGIN` for production
-- The tracking pixel endpoint is public (required for email tracking)
-- Consider rate limiting adjustments for your use case
+### What Users Should Know
+
+By using this service and connecting your Gmail account, you should understand:
+
+#### Data We Collect
+
+| Data | Purpose | Stored Where |
+|------|---------|--------------|
+| Email address & password | Account authentication | PostgreSQL (password hashed with bcrypt) |
+| Gmail OAuth tokens | Send emails on your behalf | PostgreSQL database |
+| Tracked email metadata | Subject, recipient, sender | PostgreSQL database |
+| Email open events | IP address, location, user agent, timestamp | PostgreSQL database |
+
+#### Gmail Access Scope
+
+When you connect Gmail, you grant this app permission to:
+- **Send emails as you** - The app can send emails from your Gmail account
+- **See your email address** - Used to identify you as the sender
+
+The app **cannot**:
+- Read your inbox or existing emails
+- Access your contacts
+- Delete your emails
+- Access your drafts
+
+#### What the App Administrator Can Access
+
+**The administrator of this application has full access to:**
+- All user accounts and email addresses
+- All Gmail OAuth tokens (can send emails as any connected user)
+- All tracked email data and analytics
+- All email open events with IP addresses and locations
+
+**This means the admin can:**
+- Send emails as any user who has connected Gmail
+- See every email you track and who opened it
+- See your IP-based location data
+
+#### User Whitelist
+
+Registration is restricted to a whitelist of approved email addresses. Only pre-approved users can create accounts.
+
+#### Data Persistence
+
+Data is stored in PostgreSQL and persists across restarts. There is no automatic data expiration or cleanup.
+
+### Technical Security Measures
+
+| Feature | Implementation |
+|---------|----------------|
+| Password Storage | bcrypt with 12 rounds |
+| Authentication | JWT with 15min expiry + refresh tokens |
+| Transport | HTTPS enforced in production |
+| Rate Limiting | 100 requests/15min (10 for auth endpoints) |
+| Input Validation | All endpoints validated |
+| Security Headers | Helmet.js |
+| CORS | Configurable origin restriction |
+
+### Recommendations for Users
+
+1. Only connect Gmail accounts you're comfortable the admin having send access to
+2. Disconnect Gmail when not actively using the service
+3. Be aware that your tracking data (who opens your emails) is visible to the admin
+4. Use a strong, unique password for your account
+
+### Revoking Access
+
+You can revoke Gmail access at any time:
+1. Go to [Google Account Security](https://myaccount.google.com/permissions)
+2. Find this app and click "Remove Access"
+
+This immediately invalidates the OAuth tokens stored in the database.
 
 ## License
 
