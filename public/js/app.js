@@ -266,8 +266,10 @@ class EmailTracker {
   }
 
   async viewEmailDetails(id) {
+    console.log('viewEmailDetails called with id:', id);
     try {
       const res = await this.api(`/api/track/emails/${id}`, 'GET');
+      console.log('API response:', res);
       const email = res.email;
 
       const content = document.getElementById('email-details-content');
@@ -323,20 +325,24 @@ class EmailTracker {
 
       this.showModal('details-modal');
     } catch (err) {
-      this.showNotification('Failed to load email details', 'error');
+      console.error('viewEmailDetails error:', err);
+      this.showNotification('Failed to load email details: ' + err.message, 'error');
     }
   }
 
   async deleteEmail(id) {
+    console.log('deleteEmail called with id:', id);
     if (!confirm('Are you sure you want to delete this tracked email?')) return;
 
     try {
-      await this.api(`/api/track/emails/${id}`, 'DELETE');
+      const res = await this.api(`/api/track/emails/${id}`, 'DELETE');
+      console.log('Delete response:', res);
       this.showNotification('Email deleted successfully', 'success');
       await this.loadEmails(this.currentPage);
       await this.loadStats();
     } catch (err) {
-      this.showNotification('Failed to delete email', 'error');
+      console.error('deleteEmail error:', err);
+      this.showNotification('Failed to delete email: ' + err.message, 'error');
     }
   }
 
