@@ -11,6 +11,9 @@ const gmailRoutes = require('./routes/gmail');
 
 const app = express();
 
+// Trust proxy (Railway, Heroku, etc.) - required for correct IP detection
+app.set('trust proxy', true);
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: {

@@ -20,7 +20,7 @@ const createTrackedEmail = async (userId, { subject, recipient, senderEmail }) =
     [id, userId, subject, recipient, senderEmail, createdAt]
   );
 
-  const pixelUrl = `${config.BASE_URL}/track/${id}/pixel.png`;
+  const pixelUrl = `${config.BASE_URL}/api/track/${id}/pixel.png`;
   const htmlSnippet = `<img src="${pixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
 
   return {
@@ -121,7 +121,7 @@ const getAllEmails = async (userId, { page = 1, limit = 20 } = {}) => {
         uniqueOpens: uniqueIPs.size,
         forwardDetected: uniqueIPs.size > 1,
         lastOpenedAt: lastOpen?.timestamp || null,
-        pixelUrl: `${config.BASE_URL}/track/${email.id}/pixel.png`
+        pixelUrl: `${config.BASE_URL}/api/track/${email.id}/pixel.png`
       };
     })
   );
@@ -177,8 +177,8 @@ const getEmailDetails = async (userId, emailId) => {
 
   return {
     ...email,
-    pixelUrl: `${config.BASE_URL}/track/${email.id}/pixel.png`,
-    htmlSnippet: `<img src="${config.BASE_URL}/track/${email.id}/pixel.png" width="1" height="1" style="display:none;" alt="" />`,
+    pixelUrl: `${config.BASE_URL}/api/track/${email.id}/pixel.png`,
+    htmlSnippet: `<img src="${config.BASE_URL}/api/track/${email.id}/pixel.png" width="1" height="1" style="display:none;" alt="" />`,
     openCount: opens.length,
     uniqueOpens: readers.length,
     forwardDetected: readers.length > 1,

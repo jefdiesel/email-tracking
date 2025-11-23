@@ -5,13 +5,32 @@ const { authenticate } = require('../middleware/auth');
 const { validateCreateEmail, validateTrackingId } = require('../middleware/validate');
 const { apiRateLimit, pixelRateLimit } = require('../middleware/rateLimit');
 
-// Helper to extract client IP
+// Helper to extract client IP (handles Railway, Cloudflare, and other proxies)
 const getClientIP = (req) => {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
+  // Try various headers in order of reliability
+  const cfConnectingIP = req.headers['cf-connecting-ip']; // Cloudflare
+  if (cfConnectingIP) return cfConnectingIP;
+
+  const trueClientIP = req.headers['true-client-ip']; // Akamai, Cloudflare Enterprise
+  if (trueClientIP) return trueClientIP;
+
+  const xForwardedFor = req.headers['x-forwarded-for'];
+  if (xForwardedFor) {
+    // Get the first (original client) IP from the chain
+    return xForwardedFor.split(',')[0].trim();
   }
-  return req.headers['x-real-ip'] || req.ip || 'Unknown';
+
+  const xRealIP = req.headers['x-real-ip'];
+  if (xRealIP) return xRealIP;
+
+  // Fallback to Express's req.ip
+  const ip = req.ip;
+  // Remove IPv6 prefix if present
+  if (ip && ip.startsWith('::ffff:')) {
+    return ip.slice(7);
+  }
+
+  return ip || 'Unknown';
 };
 
 // POST /api/track/create - Create tracked email
