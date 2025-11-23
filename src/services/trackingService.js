@@ -35,6 +35,8 @@ const createTrackedEmail = async (userId, { subject, recipient, senderEmail }) =
 };
 
 const recordOpen = async (emailId, { ip, userAgent, referer }) => {
+  console.log('recordOpen called with IP:', ip);
+
   // Verify email exists (no user check - pixels work for anyone)
   const email = await dbGet('SELECT id FROM tracked_emails WHERE id = ?', [emailId]);
   if (!email) {
@@ -57,13 +59,15 @@ const recordOpen = async (emailId, { ip, userAgent, referer }) => {
     ip.startsWith('172.30.') ||
     ip.startsWith('172.31.');
 
+  console.log('isLocalIP:', isLocalIP);
+
   if (!isLocalIP) {
     try {
-      const response = await fetch(
-        `${config.GEO_API_URL}/${ip}?fields=status,country,regionName,city,isp`,
-        { signal: AbortSignal.timeout(3000) }
-      );
+      const geoUrl = `${config.GEO_API_URL}/${ip}?fields=status,country,regionName,city,isp`;
+      console.log('Fetching geolocation from:', geoUrl);
+      const response = await fetch(geoUrl, { signal: AbortSignal.timeout(3000) });
       const geo = await response.json();
+      console.log('Geolocation response:', geo);
       if (geo.status === 'success') {
         location = {
           city: geo.city || 'Unknown',
@@ -71,10 +75,14 @@ const recordOpen = async (emailId, { ip, userAgent, referer }) => {
           country: geo.country || 'Unknown',
           isp: geo.isp || 'Unknown'
         };
+      } else {
+        console.log('Geolocation failed with status:', geo.status, geo.message);
       }
-    } catch {
-      // Geolocation failed, use defaults
+    } catch (err) {
+      console.error('Geolocation error:', err.message);
     }
+  } else {
+    console.log('Skipping geolocation for local IP');
   }
 
   const id = generateTrackingId();
