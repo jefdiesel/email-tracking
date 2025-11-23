@@ -50,6 +50,11 @@ const config = {
   BCRYPT_ROUNDS: parseInt(process.env.BCRYPT_ROUNDS) || 12,
   CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
 
+  // User whitelist (comma-separated emails, empty = allow all)
+  ALLOWED_EMAILS: process.env.ALLOWED_EMAILS
+    ? process.env.ALLOWED_EMAILS.split(',').map(e => e.trim().toLowerCase())
+    : [],
+
   // Geolocation
   GEO_API_URL: 'https://ip-api.com/json',
 };

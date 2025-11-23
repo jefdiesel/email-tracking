@@ -19,6 +19,13 @@ const generateTokens = (userId) => {
 };
 
 const register = async ({ email, password, name }) => {
+  // Check whitelist (if configured)
+  if (config.ALLOWED_EMAILS.length > 0) {
+    if (!config.ALLOWED_EMAILS.includes(email.toLowerCase())) {
+      throw new Error('Registration is restricted. Your email is not on the allowed list.');
+    }
+  }
+
   // Check if user exists
   const existing = await dbGet('SELECT id FROM users WHERE email = ?', [email]);
   if (existing) {
