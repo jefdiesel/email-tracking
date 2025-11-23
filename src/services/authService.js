@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { config } = require('../config/env');
 const { dbRun, dbGet, dbAll } = require('../config/database');
+const { clearUserSession } = require('./gmailService');
 
 const generateId = () => crypto.randomBytes(16).toString('hex');
 
@@ -120,10 +121,16 @@ const refreshAccessToken = async (refreshToken) => {
 };
 
 const logout = async (refreshToken) => {
+  // Get user ID before deleting session to clear Gmail tokens
+  const session = await dbGet('SELECT user_id FROM sessions WHERE refresh_token = ?', [refreshToken]);
+  if (session) {
+    clearUserSession(session.user_id);
+  }
   await dbRun('DELETE FROM sessions WHERE refresh_token = ?', [refreshToken]);
 };
 
 const logoutAll = async (userId) => {
+  clearUserSession(userId);
   await dbRun('DELETE FROM sessions WHERE user_id = ?', [userId]);
 };
 

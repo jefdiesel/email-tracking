@@ -1,7 +1,11 @@
 const { google } = require('googleapis');
 const { config } = require('../config/env');
-const { dbRun, dbGet } = require('../config/database');
+const { dbRun } = require('../config/database');
 const { createTrackedEmail } = require('./trackingService');
+
+// In-memory session store for Gmail tokens
+// Tokens are NOT persisted - users must reconnect each session for security
+const sessionTokens = new Map();
 
 const createOAuth2Client = () => {
   return new google.auth.OAuth2(
@@ -15,7 +19,7 @@ const getAuthUrl = (state) => {
   const oauth2Client = createOAuth2Client();
 
   return oauth2Client.generateAuthUrl({
-    access_type: 'offline',
+    access_type: 'online', // No refresh tokens - session only
     scope: [
       'https://www.googleapis.com/auth/gmail.send',  // Send emails only
       'https://www.googleapis.com/auth/userinfo.email'  // Get email address
@@ -32,26 +36,33 @@ const exchangeCodeForTokens = async (code) => {
   return tokens;
 };
 
+// Store tokens in memory only (session-based)
 const saveUserTokens = async (userId, tokens) => {
-  await dbRun(
-    'UPDATE users SET gmail_tokens = ?, updated_at = ? WHERE id = ?',
-    [JSON.stringify(tokens), new Date().toISOString(), userId]
-  );
+  sessionTokens.set(userId, {
+    tokens,
+    connectedAt: new Date().toISOString()
+  });
+  console.log(`Gmail connected for user ${userId} (session-based, not persisted)`);
 };
 
+// Get tokens from memory
 const getUserTokens = async (userId) => {
-  const user = await dbGet('SELECT gmail_tokens FROM users WHERE id = ?', [userId]);
-  if (!user || !user.gmail_tokens) {
+  const session = sessionTokens.get(userId);
+  if (!session) {
     return null;
   }
-  return JSON.parse(user.gmail_tokens);
+  return session.tokens;
 };
 
+// Clear tokens from memory
 const disconnectGmail = async (userId) => {
-  await dbRun(
-    'UPDATE users SET gmail_tokens = NULL, updated_at = ? WHERE id = ?',
-    [new Date().toISOString(), userId]
-  );
+  sessionTokens.delete(userId);
+  console.log(`Gmail disconnected for user ${userId}`);
+};
+
+// Clear all tokens for a user (called on logout)
+const clearUserSession = (userId) => {
+  sessionTokens.delete(userId);
 };
 
 const getAuthenticatedClient = async (userId) => {
@@ -63,11 +74,8 @@ const getAuthenticatedClient = async (userId) => {
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials(tokens);
 
-  // Handle token refresh
-  oauth2Client.on('tokens', async (newTokens) => {
-    const updatedTokens = { ...tokens, ...newTokens };
-    await saveUserTokens(userId, updatedTokens);
-  });
+  // For session-based auth, if token expires, user must reconnect
+  // No automatic refresh since we're not persisting tokens
 
   return oauth2Client;
 };
@@ -186,6 +194,7 @@ module.exports = {
   saveUserTokens,
   getUserTokens,
   disconnectGmail,
+  clearUserSession,
   getGmailProfile,
   sendTrackedEmail,
   isGmailConnected

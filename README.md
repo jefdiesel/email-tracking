@@ -145,7 +145,7 @@ By using this service and connecting your Gmail account, you should understand:
 | Data | Purpose | Stored Where |
 |------|---------|--------------|
 | Email address & password | Account authentication | PostgreSQL (password hashed with bcrypt) |
-| Gmail OAuth tokens | Send emails on your behalf | PostgreSQL database |
+| Gmail OAuth tokens | Send emails on your behalf | **Memory only (session-based)** |
 | Tracked email metadata | Subject, recipient, sender | PostgreSQL database |
 | Email open events | IP address, location, user agent, timestamp | PostgreSQL database |
 
@@ -165,14 +165,14 @@ The app **cannot**:
 
 **The administrator of this application has full access to:**
 - All user accounts and email addresses
-- All Gmail OAuth tokens (can send emails as any connected user)
 - All tracked email data and analytics
 - All email open events with IP addresses and locations
 
 **This means the admin can:**
-- Send emails as any user who has connected Gmail
 - See every email you track and who opened it
 - See your IP-based location data
+
+**Note:** Gmail tokens are session-based and stored only in memory. The admin cannot access Gmail tokens after server restart or user logout.
 
 #### User Whitelist
 
@@ -180,7 +180,8 @@ Registration is restricted to a whitelist of approved email addresses. Only pre-
 
 #### Data Persistence
 
-Data is stored in PostgreSQL and persists across restarts. There is no automatic data expiration or cleanup.
+- **User accounts & tracking data:** Stored in PostgreSQL and persists across restarts
+- **Gmail tokens:** **Session-based only** - stored in memory, cleared on logout or server restart. Users must reconnect Gmail each session for security.
 
 ### Technical Security Measures
 
@@ -196,10 +197,9 @@ Data is stored in PostgreSQL and persists across restarts. There is no automatic
 
 ### Recommendations for Users
 
-1. Only connect Gmail accounts you're comfortable the admin having send access to
-2. Disconnect Gmail when not actively using the service
-3. Be aware that your tracking data (who opens your emails) is visible to the admin
-4. Use a strong, unique password for your account
+1. Be aware that your tracking data (who opens your emails) is visible to the admin
+2. Use a strong, unique password for your account
+3. Gmail connection is session-based - you'll need to reconnect after logging out or if the server restarts
 
 ### Revoking Access
 
