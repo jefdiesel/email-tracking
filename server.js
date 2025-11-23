@@ -1,0 +1,10 @@
+const express=require('express'),tracker=require('./tracker'),app=express(),PORT=process.env.PORT||3000;
+app.use(express.json());app.use(express.static('public'));
+const getIP=r=>{const f=r.headers['x-forwarded-for'];return f?f.split(',')[0].trim():r.headers['x-real-ip']||r.ip||'Unknown'};
+app.post('/track/create',(q,r)=>{const{subject,recipient,senderEmail}=q.body,e=tracker.createTrackedEmail({subject,recipient,senderEmail}),base=`${q.protocol}://${q.get('host')}`,url=`${base}/track/${e.id}/pixel.png`;r.json({success:true,email:e,pixelUrl:url,htmlSnippet:`<img src="${url}" width="1" height="1" style="display:none;" alt="" />`})});
+app.get('/track/:id/pixel.png',async(q,r)=>{await tracker.recordOpen(q.params.id,{ip:getIP(q),userAgent:q.headers['user-agent'],referer:q.headers['referer']});r.set({'Content-Type':'image/png','Cache-Control':'no-store,no-cache,must-revalidate','Pragma':'no-cache','Expires':'0'});r.send(tracker.TRACKING_PIXEL)});
+app.get('/track/emails',(q,r)=>r.json({success:true,emails:tracker.getAllEmails()}));
+app.get('/track/emails/:id',(q,r)=>{const e=tracker.getEmailDetails(q.params.id);e?r.json({success:true,email:e}):r.status(404).json({success:false,error:'Not found'})});
+app.delete('/track/emails/:id',(q,r)=>{tracker.deleteEmail(q.params.id)?r.json({success:true}):r.status(404).json({success:false})});
+app.get('/',(q,r)=>r.redirect('/email-tracker.html'));
+app.listen(PORT,()=>console.log(`Email Tracker running on http://localhost:${PORT}`));

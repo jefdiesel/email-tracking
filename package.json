@@ -1,0 +1,25 @@
+{
+  "name": "email-tracker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jefdiesel/email-tracking.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/jefdiesel/email-tracking/issues"
+  },
+  "homepage": "https://github.com/jefdiesel/email-tracking#readme",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
