@@ -1,113 +1,117 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const fs = require('fs');
+const { Pool } = require('pg');
 
-const dataDir = path.join(__dirname, '../../data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
+// PostgreSQL connection - Railway provides DATABASE_URL automatically
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
-const DB_PATH = process.env.DB_PATH || path.join(dataDir, 'email_tracker.db');
+const initDatabase = async () => {
+  const client = await pool.connect();
+  try {
+    // Users table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        name TEXT,
+        gmail_tokens TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
-const db = new sqlite3.Database(DB_PATH);
+    // Tracked emails table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tracked_emails (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        subject TEXT NOT NULL,
+        recipient TEXT NOT NULL,
+        sender_email TEXT,
+        gmail_message_id TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
-const initDatabase = () => {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      // Users table
-      db.run(`
-        CREATE TABLE IF NOT EXISTS users (
-          id TEXT PRIMARY KEY,
-          email TEXT UNIQUE NOT NULL,
-          password_hash TEXT NOT NULL,
-          name TEXT,
-          gmail_tokens TEXT,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+    // Email opens table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS email_opens (
+        id TEXT PRIMARY KEY,
+        email_id TEXT NOT NULL REFERENCES tracked_emails(id) ON DELETE CASCADE,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ip TEXT,
+        user_agent TEXT,
+        referer TEXT,
+        city TEXT,
+        region TEXT,
+        country TEXT,
+        isp TEXT
+      )
+    `);
 
-      // Tracked emails table
-      db.run(`
-        CREATE TABLE IF NOT EXISTS tracked_emails (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL,
-          subject TEXT NOT NULL,
-          recipient TEXT NOT NULL,
-          sender_email TEXT,
-          gmail_message_id TEXT,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-      `);
+    // Sessions table for refresh tokens
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        refresh_token TEXT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
-      // Email opens table
-      db.run(`
-        CREATE TABLE IF NOT EXISTS email_opens (
-          id TEXT PRIMARY KEY,
-          email_id TEXT NOT NULL,
-          timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-          ip TEXT,
-          user_agent TEXT,
-          referer TEXT,
-          city TEXT,
-          region TEXT,
-          country TEXT,
-          isp TEXT,
-          FOREIGN KEY (email_id) REFERENCES tracked_emails(id) ON DELETE CASCADE
-        )
-      `);
+    // Create indexes for performance
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_tracked_emails_user_id ON tracked_emails(user_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_email_opens_email_id ON email_opens(email_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token ON sessions(refresh_token)`);
 
-      // Sessions table for refresh tokens
-      db.run(`
-        CREATE TABLE IF NOT EXISTS sessions (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL,
-          refresh_token TEXT NOT NULL,
-          expires_at TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-      `, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
-  });
+    console.log('Database tables initialized');
+  } finally {
+    client.release();
+  }
 };
 
-// Promisified database methods
-const dbRun = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-      if (err) reject(err);
-      else resolve({ lastID: this.lastID, changes: this.changes });
-    });
-  });
+// Database query methods
+const dbRun = async (sql, params = []) => {
+  // Convert ? placeholders to $1, $2, etc for PostgreSQL
+  let paramIndex = 0;
+  const pgSql = sql.replace(/\?/g, () => `$${++paramIndex}`);
+
+  const result = await pool.query(pgSql, params);
+  return { rowCount: result.rowCount, changes: result.rowCount };
 };
 
-const dbGet = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
+const dbGet = async (sql, params = []) => {
+  // Convert ? placeholders to $1, $2, etc for PostgreSQL
+  let paramIndex = 0;
+  const pgSql = sql.replace(/\?/g, () => `$${++paramIndex}`);
+
+  const result = await pool.query(pgSql, params);
+  return result.rows[0] || null;
 };
 
-const dbAll = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
+const dbAll = async (sql, params = []) => {
+  // Convert ? placeholders to $1, $2, etc for PostgreSQL
+  let paramIndex = 0;
+  const pgSql = sql.replace(/\?/g, () => `$${++paramIndex}`);
+
+  const result = await pool.query(pgSql, params);
+  return result.rows;
+};
+
+// Graceful shutdown
+const closeDatabase = async () => {
+  await pool.end();
 };
 
 module.exports = {
-  db,
+  pool,
   initDatabase,
   dbRun,
   dbGet,
-  dbAll
+  dbAll,
+  closeDatabase
 };

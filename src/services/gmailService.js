@@ -17,9 +17,9 @@ const getAuthUrl = (state) => {
   return oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: [
-      'https://www.googleapis.com/auth/gmail.send',
-      'https://www.googleapis.com/auth/gmail.readonly',
-      'https://www.googleapis.com/auth/userinfo.email'
+      'https://www.googleapis.com/auth/gmail.send',  // Send emails only
+      'https://www.googleapis.com/auth/userinfo.email'  // Get email address
+      // NOTE: No gmail.readonly - we cannot read user's emails
     ],
     state,
     prompt: 'consent'
@@ -74,23 +74,22 @@ const getAuthenticatedClient = async (userId) => {
 
 const getGmailProfile = async (userId) => {
   const auth = await getAuthenticatedClient(userId);
-  const gmail = google.gmail({ version: 'v1', auth });
+  const oauth2 = google.oauth2({ version: 'v2', auth });
 
-  const profile = await gmail.users.getProfile({ userId: 'me' });
+  const userInfo = await oauth2.userinfo.get();
   return {
-    email: profile.data.emailAddress,
-    messagesTotal: profile.data.messagesTotal,
-    threadsTotal: profile.data.threadsTotal
+    email: userInfo.data.email
   };
 };
 
 const sendTrackedEmail = async (userId, { to, subject, body, isHtml = false }) => {
   const auth = await getAuthenticatedClient(userId);
   const gmail = google.gmail({ version: 'v1', auth });
+  const oauth2 = google.oauth2({ version: 'v2', auth });
 
-  // Get sender email from Gmail profile
-  const profile = await gmail.users.getProfile({ userId: 'me' });
-  const senderEmail = profile.data.emailAddress;
+  // Get sender email from userinfo (not gmail.readonly)
+  const userInfo = await oauth2.userinfo.get();
+  const senderEmail = userInfo.data.email;
 
   // Create tracked email record
   const trackedEmail = await createTrackedEmail(userId, {

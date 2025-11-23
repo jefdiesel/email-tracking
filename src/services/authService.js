@@ -82,7 +82,7 @@ const login = async ({ email, password }) => {
 
 const refreshAccessToken = async (refreshToken) => {
   const session = await dbGet(
-    'SELECT * FROM sessions WHERE refresh_token = ? AND expires_at > datetime("now")',
+    'SELECT * FROM sessions WHERE refresh_token = ? AND expires_at > NOW()',
     [refreshToken]
   );
 

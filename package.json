@@ -34,7 +34,7 @@
     "googleapis": "^128.0.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "sqlite3": "^5.1.7"
+    "pg": "^8.11.3"
   },
   "engines": {
     "node": ">=18.0.0"
