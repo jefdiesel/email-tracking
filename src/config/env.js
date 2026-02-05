@@ -55,8 +55,8 @@ const config = {
     ? process.env.ALLOWED_EMAILS.split(',').map(e => e.trim().toLowerCase())
     : [],
 
-  // Geolocation
-  GEO_API_URL: 'https://ip-api.com/json',
+  // Geolocation (free tier requires HTTP, not HTTPS)
+  GEO_API_URL: 'http://ip-api.com/json',
 
   // Cloudflare R2
   R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID || '',
