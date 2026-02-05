@@ -309,11 +309,32 @@ class EmailTracker {
                 <div class="reader-header">
                   <span class="reader-ip">${reader.ip}</span>
                   <span class="reader-count">${reader.openCount} opens</span>
+                  ${reader.device?.isBot ? '<span class="badge badge-warning">Bot</span>' : ''}
+                  ${reader.location?.isProxy ? '<span class="badge badge-warning">Proxy/VPN</span>' : ''}
+                  ${reader.location?.isHosting ? '<span class="badge badge-info">Hosting/DC</span>' : ''}
                 </div>
                 <div class="reader-location">
-                  ${reader.location.city}, ${reader.location.region}, ${reader.location.country}
-                  ${reader.location.isp !== 'Unknown' ? ` (${reader.location.isp})` : ''}
+                  <strong>Location:</strong> ${reader.location.city}, ${reader.location.region}, ${reader.location.country}
+                  ${reader.location.countryCode ? `(${reader.location.countryCode})` : ''}
+                  ${reader.location.timezone ? `· ${reader.location.timezone}` : ''}
                 </div>
+                <div class="reader-device">
+                  <strong>Device:</strong> ${reader.device?.deviceType || 'Unknown'}
+                  ${reader.location?.isMobile ? '(Mobile Network)' : ''}
+                  · ${reader.device?.browser || 'Unknown'}${reader.device?.browserVersion ? ' ' + reader.device.browserVersion : ''}
+                  · ${reader.device?.os || 'Unknown'}${reader.device?.osVersion ? ' ' + reader.device.osVersion : ''}
+                </div>
+                <div class="reader-network">
+                  <strong>Network:</strong> ${reader.location.isp !== 'Unknown' ? reader.location.isp : ''}
+                  ${reader.location.org && reader.location.org !== reader.location.isp ? `(${reader.location.org})` : ''}
+                </div>
+                ${reader.device?.language ? `<div class="reader-lang"><strong>Language:</strong> ${reader.device.language}</div>` : ''}
+                ${reader.location.lat && reader.location.lon ? `
+                  <div class="reader-coords">
+                    <strong>Coords:</strong> ${reader.location.lat.toFixed(4)}, ${reader.location.lon.toFixed(4)}
+                    <a href="https://maps.google.com/?q=${reader.location.lat},${reader.location.lon}" target="_blank" class="map-link">View Map</a>
+                  </div>
+                ` : ''}
                 <div class="reader-times">
                   First: ${this.formatDate(reader.firstOpen)} |
                   Last: ${this.formatDate(reader.lastOpen)}

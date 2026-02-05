@@ -4,6 +4,87 @@ const { dbRun, dbGet, dbAll } = require('../config/database');
 
 const generateTrackingId = () => crypto.randomBytes(16).toString('hex');
 
+// Parse user agent string
+const parseUserAgent = (ua) => {
+  if (!ua) return { browser: 'Unknown', browserVersion: '', os: 'Unknown', osVersion: '', deviceType: 'Unknown', isBot: false };
+
+  const result = {
+    browser: 'Unknown',
+    browserVersion: '',
+    os: 'Unknown',
+    osVersion: '',
+    deviceType: 'Desktop',
+    isBot: false
+  };
+
+  // Bot detection
+  const botPatterns = /bot|crawler|spider|crawling|facebookexternalhit|slurp|googlebot|bingbot|yandex|baidu|duckduck|sogou|exabot|ia_archiver|semrush|ahref|mj12bot|dotbot|petalbot|bytespider/i;
+  if (botPatterns.test(ua)) {
+    result.isBot = true;
+    result.deviceType = 'Bot';
+  }
+
+  // Browser detection
+  if (/Edg\//i.test(ua)) {
+    result.browser = 'Edge';
+    result.browserVersion = ua.match(/Edg\/([\d.]+)/)?.[1] || '';
+  } else if (/OPR\//i.test(ua) || /Opera/i.test(ua)) {
+    result.browser = 'Opera';
+    result.browserVersion = ua.match(/(?:OPR|Opera)\/([\d.]+)/)?.[1] || '';
+  } else if (/Chrome/i.test(ua) && !/Chromium/i.test(ua)) {
+    result.browser = 'Chrome';
+    result.browserVersion = ua.match(/Chrome\/([\d.]+)/)?.[1] || '';
+  } else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) {
+    result.browser = 'Safari';
+    result.browserVersion = ua.match(/Version\/([\d.]+)/)?.[1] || '';
+  } else if (/Firefox/i.test(ua)) {
+    result.browser = 'Firefox';
+    result.browserVersion = ua.match(/Firefox\/([\d.]+)/)?.[1] || '';
+  } else if (/MSIE|Trident/i.test(ua)) {
+    result.browser = 'Internet Explorer';
+    result.browserVersion = ua.match(/(?:MSIE |rv:)([\d.]+)/)?.[1] || '';
+  }
+
+  // OS detection
+  if (/Windows NT 10/i.test(ua)) {
+    result.os = 'Windows';
+    result.osVersion = '10/11';
+  } else if (/Windows NT 6.3/i.test(ua)) {
+    result.os = 'Windows';
+    result.osVersion = '8.1';
+  } else if (/Windows NT 6.2/i.test(ua)) {
+    result.os = 'Windows';
+    result.osVersion = '8';
+  } else if (/Windows NT 6.1/i.test(ua)) {
+    result.os = 'Windows';
+    result.osVersion = '7';
+  } else if (/Windows/i.test(ua)) {
+    result.os = 'Windows';
+  } else if (/Mac OS X/i.test(ua)) {
+    result.os = 'macOS';
+    result.osVersion = ua.match(/Mac OS X ([\d_]+)/)?.[1]?.replace(/_/g, '.') || '';
+  } else if (/iPhone|iPad|iPod/i.test(ua)) {
+    result.os = 'iOS';
+    result.osVersion = ua.match(/OS ([\d_]+)/)?.[1]?.replace(/_/g, '.') || '';
+  } else if (/Android/i.test(ua)) {
+    result.os = 'Android';
+    result.osVersion = ua.match(/Android ([\d.]+)/)?.[1] || '';
+  } else if (/Linux/i.test(ua)) {
+    result.os = 'Linux';
+  } else if (/CrOS/i.test(ua)) {
+    result.os = 'Chrome OS';
+  }
+
+  // Device type
+  if (/Mobile|iPhone|Android.*Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
+    result.deviceType = 'Mobile';
+  } else if (/iPad|Android(?!.*Mobile)|Tablet/i.test(ua)) {
+    result.deviceType = 'Tablet';
+  }
+
+  return result;
+};
+
 // 1x1 transparent PNG
 const TRACKING_PIXEL = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
@@ -34,7 +115,7 @@ const createTrackedEmail = async (userId, { subject, recipient, senderEmail }) =
   };
 };
 
-const recordOpen = async (emailId, { ip, userAgent, referer }) => {
+const recordOpen = async (emailId, { ip, userAgent, referer, language }) => {
   console.log('recordOpen called with IP:', ip);
 
   // Verify email exists (no user check - pixels work for anyone)
@@ -43,8 +124,15 @@ const recordOpen = async (emailId, { ip, userAgent, referer }) => {
     return null;
   }
 
-  // Get geolocation
-  let location = { city: 'Unknown', region: 'Unknown', country: 'Unknown', isp: 'Unknown' };
+  // Parse user agent
+  const uaInfo = parseUserAgent(userAgent);
+
+  // Get geolocation with extended fields
+  let location = {
+    city: 'Unknown', region: 'Unknown', country: 'Unknown', countryCode: '',
+    isp: 'Unknown', org: '', timezone: '', lat: null, lon: null,
+    mobile: false, proxy: false, hosting: false
+  };
 
   const isLocalIP = !ip ||
     ip === '127.0.0.1' ||
@@ -63,7 +151,8 @@ const recordOpen = async (emailId, { ip, userAgent, referer }) => {
 
   if (!isLocalIP) {
     try {
-      const geoUrl = `${config.GEO_API_URL}/${ip}?fields=status,country,regionName,city,isp`;
+      // Request all available fields from ip-api.com
+      const geoUrl = `${config.GEO_API_URL}/${ip}?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,isp,org,mobile,proxy,hosting`;
       console.log('Fetching geolocation from:', geoUrl);
       const response = await fetch(geoUrl, { signal: AbortSignal.timeout(3000) });
       const geo = await response.json();
@@ -73,7 +162,15 @@ const recordOpen = async (emailId, { ip, userAgent, referer }) => {
           city: geo.city || 'Unknown',
           region: geo.regionName || 'Unknown',
           country: geo.country || 'Unknown',
-          isp: geo.isp || 'Unknown'
+          countryCode: geo.countryCode || '',
+          isp: geo.isp || 'Unknown',
+          org: geo.org || '',
+          timezone: geo.timezone || '',
+          lat: geo.lat || null,
+          lon: geo.lon || null,
+          mobile: geo.mobile || false,
+          proxy: geo.proxy || false,
+          hosting: geo.hosting || false
         };
       } else {
         console.log('Geolocation failed with status:', geo.status, geo.message);
@@ -83,18 +180,31 @@ const recordOpen = async (emailId, { ip, userAgent, referer }) => {
     }
   } else {
     console.log('Skipping geolocation for local IP');
+    location.city = 'Local Network';
+    location.country = 'Local';
   }
 
   const id = generateTrackingId();
   const timestamp = new Date().toISOString();
 
   await dbRun(
-    `INSERT INTO email_opens (id, email_id, timestamp, ip, user_agent, referer, city, region, country, isp)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, emailId, timestamp, ip || 'Unknown', userAgent, referer, location.city, location.region, location.country, location.isp]
+    `INSERT INTO email_opens (
+      id, email_id, timestamp, ip, user_agent, referer,
+      city, region, country, country_code, isp, org, timezone, lat, lon,
+      is_mobile, is_proxy, is_hosting,
+      browser, browser_version, os, os_version, device_type, is_bot, language
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id, emailId, timestamp, ip || 'Unknown', userAgent, referer,
+      location.city, location.region, location.country, location.countryCode,
+      location.isp, location.org, location.timezone, location.lat, location.lon,
+      location.mobile, location.proxy, location.hosting,
+      uaInfo.browser, uaInfo.browserVersion, uaInfo.os, uaInfo.osVersion,
+      uaInfo.deviceType, uaInfo.isBot, language || null
+    ]
   );
 
-  return { id, emailId, timestamp, ip, location, userAgent, referer };
+  return { id, emailId, timestamp, ip, location, uaInfo, referer, language };
 };
 
 const getAllEmails = async (userId, { page = 1, limit = 20 } = {}) => {
@@ -175,7 +285,24 @@ const getEmailDetails = async (userId, emailId) => {
       city: ipOpens[0].city,
       region: ipOpens[0].region,
       country: ipOpens[0].country,
-      isp: ipOpens[0].isp
+      countryCode: ipOpens[0].country_code,
+      isp: ipOpens[0].isp,
+      org: ipOpens[0].org,
+      timezone: ipOpens[0].timezone,
+      lat: ipOpens[0].lat,
+      lon: ipOpens[0].lon,
+      isMobile: ipOpens[0].is_mobile,
+      isProxy: ipOpens[0].is_proxy,
+      isHosting: ipOpens[0].is_hosting
+    },
+    device: {
+      browser: ipOpens[0].browser,
+      browserVersion: ipOpens[0].browser_version,
+      os: ipOpens[0].os,
+      osVersion: ipOpens[0].os_version,
+      deviceType: ipOpens[0].device_type,
+      isBot: ipOpens[0].is_bot,
+      language: ipOpens[0].language
     },
     userAgent: ipOpens[0].user_agent,
     openCount: ipOpens.length,

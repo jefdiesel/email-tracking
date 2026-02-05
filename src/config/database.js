@@ -47,9 +47,50 @@ const initDatabase = async () => {
         city TEXT,
         region TEXT,
         country TEXT,
-        isp TEXT
+        country_code TEXT,
+        isp TEXT,
+        org TEXT,
+        timezone TEXT,
+        lat REAL,
+        lon REAL,
+        is_mobile BOOLEAN DEFAULT FALSE,
+        is_proxy BOOLEAN DEFAULT FALSE,
+        is_hosting BOOLEAN DEFAULT FALSE,
+        browser TEXT,
+        browser_version TEXT,
+        os TEXT,
+        os_version TEXT,
+        device_type TEXT,
+        is_bot BOOLEAN DEFAULT FALSE,
+        language TEXT
       )
     `);
+
+    // Add new columns if they don't exist (migration for existing databases)
+    const newColumns = [
+      { name: 'country_code', type: 'TEXT' },
+      { name: 'org', type: 'TEXT' },
+      { name: 'timezone', type: 'TEXT' },
+      { name: 'lat', type: 'REAL' },
+      { name: 'lon', type: 'REAL' },
+      { name: 'is_mobile', type: 'BOOLEAN DEFAULT FALSE' },
+      { name: 'is_proxy', type: 'BOOLEAN DEFAULT FALSE' },
+      { name: 'is_hosting', type: 'BOOLEAN DEFAULT FALSE' },
+      { name: 'browser', type: 'TEXT' },
+      { name: 'browser_version', type: 'TEXT' },
+      { name: 'os', type: 'TEXT' },
+      { name: 'os_version', type: 'TEXT' },
+      { name: 'device_type', type: 'TEXT' },
+      { name: 'is_bot', type: 'BOOLEAN DEFAULT FALSE' },
+      { name: 'language', type: 'TEXT' }
+    ];
+    for (const col of newColumns) {
+      try {
+        await client.query(`ALTER TABLE email_opens ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+      } catch (e) {
+        // Column might already exist
+      }
+    }
 
     // Sessions table for refresh tokens
     await client.query(`

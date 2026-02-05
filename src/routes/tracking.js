@@ -65,7 +65,8 @@ router.get('/:id/pixel.png', pixelRateLimit, async (req, res) => {
     await trackingService.recordOpen(id, {
       ip: getClientIP(req),
       userAgent: req.headers['user-agent'],
-      referer: req.headers['referer']
+      referer: req.headers['referer'],
+      language: req.headers['accept-language']?.split(',')[0] || null
     });
 
     // Return 1x1 transparent PNG with no-cache headers
