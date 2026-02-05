@@ -498,6 +498,8 @@ const getAttachmentsByEmail = async (emailId) => {
 };
 
 const recordDownload = async (attachmentId, { ip, userAgent, language }) => {
+  console.log('recordDownload called with IP:', ip);
+
   // Parse user agent
   const uaInfo = parseUserAgent(userAgent);
 
@@ -513,7 +515,13 @@ const recordDownload = async (attachmentId, { ip, userAgent, language }) => {
     ip === '::1' ||
     ip.startsWith('192.168.') ||
     ip.startsWith('10.') ||
-    ip.startsWith('172.');
+    ip.startsWith('172.16.') ||
+    ip.startsWith('172.17.') ||
+    ip.startsWith('172.18.') ||
+    ip.startsWith('172.19.') ||
+    ip.startsWith('172.2') ||
+    ip.startsWith('172.30.') ||
+    ip.startsWith('172.31.');
 
   // Detect known proxies and scanners
   const isGoogleProxy = ip && (ip.startsWith('74.125.') || ip.startsWith('66.249.') || ip.startsWith('209.85.'));
@@ -523,6 +531,8 @@ const recordDownload = async (attachmentId, { ip, userAgent, language }) => {
     ip.startsWith('18.') || ip.startsWith('3.') ||
     ip.startsWith('146.75.') || ip.startsWith('151.101.')
   );
+
+  console.log('Download - isLocalIP:', isLocalIP, 'isGoogleProxy:', isGoogleProxy, 'isSecurityScanner:', isSecurityScanner);
 
   if (isGoogleProxy) {
     location.city = 'Gmail Proxy';
@@ -540,8 +550,10 @@ const recordDownload = async (attachmentId, { ip, userAgent, language }) => {
   } else if (!isLocalIP) {
     try {
       const geoUrl = `${config.GEO_API_URL}/${ip}?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,isp,org,mobile,proxy,hosting`;
+      console.log('Download - Fetching geolocation from:', geoUrl);
       const response = await fetch(geoUrl, { signal: AbortSignal.timeout(3000) });
       const geo = await response.json();
+      console.log('Download - Geolocation response:', geo);
       if (geo.status === 'success') {
         location = {
           city: geo.city || 'Unknown',
@@ -557,10 +569,15 @@ const recordDownload = async (attachmentId, { ip, userAgent, language }) => {
           proxy: geo.proxy || false,
           hosting: geo.hosting || false
         };
+        console.log('Download - Location set to:', location);
+      } else {
+        console.log('Download - Geolocation failed with status:', geo.status, geo.message);
       }
     } catch (err) {
       console.error('Geolocation error for download:', err.message);
     }
+  } else {
+    console.log('Download - Skipping geolocation for local IP');
   }
 
   const id = generateTrackingId();
