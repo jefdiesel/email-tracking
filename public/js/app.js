@@ -301,6 +301,35 @@ class EmailTracker {
           <code>${this.escapeHtml(email.htmlSnippet)}</code>
         </div>
 
+        ${email.attachments && email.attachments.length > 0 ? `
+          <div class="attachments-section">
+            <h4>Attachments (${email.attachments.length})</h4>
+            ${email.attachments.map(att => `
+              <div class="attachment-card">
+                <div class="attachment-header">
+                  <span class="attachment-name">📎 ${this.escapeHtml(att.filename)}</span>
+                  <span class="attachment-size">${this.formatFileSize(att.size)}</span>
+                  <span class="badge ${att.downloadCount > 0 ? 'badge-success' : 'badge-warning'}">
+                    ${att.downloadCount} downloads
+                  </span>
+                </div>
+                ${att.downloads && att.downloads.length > 0 ? `
+                  <div class="attachment-downloads">
+                    ${att.downloads.map(dl => `
+                      <div class="download-item">
+                        <span class="download-ip">${dl.ip}</span>
+                        <span class="download-device">${dl.device?.browser || 'Unknown'} / ${dl.device?.os || 'Unknown'}</span>
+                        <span class="download-location">${dl.location?.city || 'Unknown'}, ${dl.location?.country || 'Unknown'}</span>
+                        <span class="download-time">${this.formatDate(dl.timestamp)}</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                ` : '<p class="empty-state">No downloads yet</p>'}
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+
         <div class="readers-section">
           <h4>Readers (${email.readers.length})</h4>
           ${email.readers.length === 0 ? '<p class="empty-state">No readers yet</p>' :
@@ -625,6 +654,13 @@ class EmailTracker {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  formatFileSize(bytes) {
+    if (!bytes) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 }
 

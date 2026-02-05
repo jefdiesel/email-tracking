@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const trackingService = require('../services/trackingService');
+const r2Service = require('../services/r2Service');
 const { authenticate } = require('../middleware/auth');
 const { validateCreateEmail, validateTrackingId } = require('../middleware/validate');
 const { apiRateLimit, pixelRateLimit } = require('../middleware/rateLimit');
@@ -176,6 +177,66 @@ router.delete('/emails/:id', authenticate, apiRateLimit, validateTrackingId, asy
       success: false,
       error: 'Failed to delete email'
     });
+  }
+});
+
+// GET /api/track/download/:attachmentId - Tracked file download
+router.get('/download/:attachmentId', async (req, res) => {
+  try {
+    const { attachmentId } = req.params;
+
+    // Get attachment metadata
+    const attachment = await trackingService.getAttachment(attachmentId);
+    if (!attachment) {
+      return res.status(404).json({ success: false, error: 'File not found' });
+    }
+
+    // Record the download
+    await trackingService.recordDownload(attachmentId, {
+      ip: getClientIP(req),
+      userAgent: req.headers['user-agent'],
+      language: req.headers['accept-language']?.split(',')[0] || null
+    });
+
+    // Get file from R2 and stream it
+    const file = await r2Service.getFile(attachment.r2_key);
+
+    res.set({
+      'Content-Type': file.contentType || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${attachment.filename.replace(/"/g, '\\"')}"`,
+      'Content-Length': file.contentLength,
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+    });
+
+    // Stream the file
+    file.body.pipe(res);
+  } catch (error) {
+    console.error('Download tracking error:', error);
+    res.status(500).json({ success: false, error: 'Download failed' });
+  }
+});
+
+// GET /api/track/emails/:id/attachments - Get attachments for an email
+router.get('/emails/:id/attachments', authenticate, apiRateLimit, validateTrackingId, async (req, res) => {
+  try {
+    const attachments = await trackingService.getAttachmentsByEmail(req.params.id);
+
+    // Add download counts
+    const attachmentsWithStats = await Promise.all(
+      attachments.map(async (att) => {
+        const downloads = await trackingService.getDownloadsByAttachment(att.id);
+        return {
+          ...att,
+          downloadCount: downloads.length,
+          downloads
+        };
+      })
+    );
+
+    res.json({ success: true, attachments: attachmentsWithStats });
+  } catch (error) {
+    console.error('Get attachments error:', error);
+    res.status(500).json({ success: false, error: 'Failed to get attachments' });
   }
 });
 

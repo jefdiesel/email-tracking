@@ -310,6 +310,47 @@ const getEmailDetails = async (userId, emailId) => {
     lastOpen: ipOpens[ipOpens.length - 1].timestamp
   }));
 
+  // Get attachments with download stats
+  const attachments = await getAttachmentsByEmail(emailId);
+  const attachmentsWithStats = await Promise.all(
+    attachments.map(async (att) => {
+      const downloads = await getDownloadsByAttachment(att.id);
+      const uniqueIPs = new Set(downloads.map(d => d.ip));
+      return {
+        ...att,
+        downloadUrl: `${config.BASE_URL}/api/track/download/${att.id}`,
+        downloadCount: downloads.length,
+        uniqueDownloads: uniqueIPs.size,
+        downloads: downloads.map(d => ({
+          ...d,
+          device: {
+            browser: d.browser,
+            browserVersion: d.browser_version,
+            os: d.os,
+            osVersion: d.os_version,
+            deviceType: d.device_type,
+            isBot: d.is_bot,
+            language: d.language
+          },
+          location: {
+            city: d.city,
+            region: d.region,
+            country: d.country,
+            countryCode: d.country_code,
+            isp: d.isp,
+            org: d.org,
+            timezone: d.timezone,
+            lat: d.lat,
+            lon: d.lon,
+            isMobile: d.is_mobile,
+            isProxy: d.is_proxy,
+            isHosting: d.is_hosting
+          }
+        }))
+      };
+    })
+  );
+
   return {
     ...email,
     pixelUrl: `${config.BASE_URL}/api/track/${email.id}/pixel.png`,
@@ -318,7 +359,8 @@ const getEmailDetails = async (userId, emailId) => {
     uniqueOpens: readers.length,
     forwardDetected: readers.length > 1,
     opens,
-    readers
+    readers,
+    attachments: attachmentsWithStats
   };
 };
 
@@ -366,6 +408,97 @@ const getStats = async (userId) => {
   };
 };
 
+const saveAttachment = async (emailId, { fileId, filename, mimetype, size, r2Key }) => {
+  await dbRun(
+    `INSERT INTO attachments (id, email_id, filename, mimetype, size, r2_key)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [fileId, emailId, filename, mimetype, size, r2Key]
+  );
+  return { id: fileId, emailId, filename, mimetype, size, r2Key };
+};
+
+const getAttachment = async (attachmentId) => {
+  return await dbGet('SELECT * FROM attachments WHERE id = ?', [attachmentId]);
+};
+
+const getAttachmentsByEmail = async (emailId) => {
+  return await dbAll('SELECT * FROM attachments WHERE email_id = ?', [emailId]);
+};
+
+const recordDownload = async (attachmentId, { ip, userAgent, language }) => {
+  // Parse user agent
+  const uaInfo = parseUserAgent(userAgent);
+
+  // Get geolocation
+  let location = {
+    city: 'Unknown', region: 'Unknown', country: 'Unknown', countryCode: '',
+    isp: 'Unknown', org: '', timezone: '', lat: null, lon: null,
+    mobile: false, proxy: false, hosting: false
+  };
+
+  const isLocalIP = !ip ||
+    ip === '127.0.0.1' ||
+    ip === '::1' ||
+    ip.startsWith('192.168.') ||
+    ip.startsWith('10.') ||
+    ip.startsWith('172.');
+
+  if (!isLocalIP) {
+    try {
+      const geoUrl = `${config.GEO_API_URL}/${ip}?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,isp,org,mobile,proxy,hosting`;
+      const response = await fetch(geoUrl, { signal: AbortSignal.timeout(3000) });
+      const geo = await response.json();
+      if (geo.status === 'success') {
+        location = {
+          city: geo.city || 'Unknown',
+          region: geo.regionName || 'Unknown',
+          country: geo.country || 'Unknown',
+          countryCode: geo.countryCode || '',
+          isp: geo.isp || 'Unknown',
+          org: geo.org || '',
+          timezone: geo.timezone || '',
+          lat: geo.lat || null,
+          lon: geo.lon || null,
+          mobile: geo.mobile || false,
+          proxy: geo.proxy || false,
+          hosting: geo.hosting || false
+        };
+      }
+    } catch (err) {
+      console.error('Geolocation error for download:', err.message);
+    }
+  }
+
+  const id = generateTrackingId();
+  const timestamp = new Date().toISOString();
+
+  await dbRun(
+    `INSERT INTO attachment_downloads (
+      id, attachment_id, timestamp, ip, user_agent,
+      city, region, country, country_code, isp, org, timezone, lat, lon,
+      is_mobile, is_proxy, is_hosting,
+      browser, browser_version, os, os_version, device_type, is_bot, language
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id, attachmentId, timestamp, ip || 'Unknown', userAgent,
+      location.city, location.region, location.country, location.countryCode,
+      location.isp, location.org, location.timezone, location.lat, location.lon,
+      location.mobile, location.proxy, location.hosting,
+      uaInfo.browser, uaInfo.browserVersion, uaInfo.os, uaInfo.osVersion,
+      uaInfo.deviceType, uaInfo.isBot, language || null
+    ]
+  );
+
+  return { id, attachmentId, timestamp, ip, location, uaInfo };
+};
+
+const getDownloadsByAttachment = async (attachmentId) => {
+  return await dbAll(
+    'SELECT * FROM attachment_downloads WHERE attachment_id = ? ORDER BY timestamp DESC',
+    [attachmentId]
+  );
+};
+
 module.exports = {
   TRACKING_PIXEL,
   createTrackedEmail,
@@ -373,5 +506,11 @@ module.exports = {
   getAllEmails,
   getEmailDetails,
   deleteEmail,
-  getStats
+  getStats,
+  saveAttachment,
+  getAttachment,
+  getAttachmentsByEmail,
+  recordDownload,
+  getDownloadsByAttachment,
+  parseUserAgent
 };

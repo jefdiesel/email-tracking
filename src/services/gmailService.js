@@ -1,7 +1,8 @@
 const { google } = require('googleapis');
 const { config } = require('../config/env');
 const { dbRun } = require('../config/database');
-const { createTrackedEmail } = require('./trackingService');
+const { createTrackedEmail, saveAttachment } = require('./trackingService');
+const r2Service = require('./r2Service');
 
 // In-memory session store for Gmail tokens
 // Tokens are NOT persisted - users must reconnect each session for security
@@ -106,21 +107,88 @@ const sendTrackedEmail = async (userId, { to, cc, bcc, subject, body, isHtml = f
     senderEmail
   });
 
-  // Append tracking pixel to email body
+  // Handle attachments - upload to R2 if configured, otherwise inline
+  let attachmentLinks = [];
+  let inlineAttachments = [];
+
+  if (attachments.length > 0) {
+    if (r2Service.isConfigured()) {
+      // Upload to R2 and create tracked download links
+      for (const file of attachments) {
+        try {
+          const uploaded = await r2Service.uploadFile(
+            file.buffer,
+            file.originalname,
+            file.mimetype,
+            trackedEmail.id
+          );
+
+          await saveAttachment(trackedEmail.id, {
+            fileId: uploaded.fileId,
+            filename: file.originalname,
+            mimetype: file.mimetype,
+            size: uploaded.size,
+            r2Key: uploaded.key
+          });
+
+          const downloadUrl = `${config.BASE_URL}/api/track/download/${uploaded.fileId}`;
+          attachmentLinks.push({
+            filename: file.originalname,
+            size: file.size,
+            url: downloadUrl
+          });
+        } catch (err) {
+          console.error('R2 upload failed, falling back to inline:', err.message);
+          inlineAttachments.push(file);
+        }
+      }
+    } else {
+      // R2 not configured - use inline attachments
+      inlineAttachments = attachments;
+    }
+  }
+
+  // Build attachment links HTML
+  let attachmentHtml = '';
+  if (attachmentLinks.length > 0) {
+    const formatSize = (bytes) => {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    attachmentHtml = `
+      <div style="margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+        <p style="margin: 0 0 10px 0; font-weight: bold; color: #333;">Attachments:</p>
+        ${attachmentLinks.map(att => `
+          <p style="margin: 5px 0;">
+            <a href="${att.url}" style="color: #4f46e5; text-decoration: none;">
+              📎 ${escapeHtml(att.filename)}
+            </a>
+            <span style="color: #666; font-size: 12px;">(${formatSize(att.size)})</span>
+          </p>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // Append tracking pixel and attachment links to email body
   let emailBody = body;
   if (isHtml) {
-    // Insert tracking pixel before closing body tag or at end
+    // Insert before closing body tag or at end
+    const insertContent = attachmentHtml + trackedEmail.htmlSnippet;
     if (emailBody.includes('</body>')) {
-      emailBody = emailBody.replace('</body>', `${trackedEmail.htmlSnippet}</body>`);
+      emailBody = emailBody.replace('</body>', `${insertContent}</body>`);
     } else {
-      emailBody += trackedEmail.htmlSnippet;
+      emailBody += insertContent;
     }
   } else {
-    // Convert plain text to HTML and add pixel
+    // Convert plain text to HTML and add pixel + attachments
     emailBody = `
       <html>
         <body>
           <div style="white-space: pre-wrap;">${escapeHtml(body)}</div>
+          ${attachmentHtml}
           ${trackedEmail.htmlSnippet}
         </body>
       </html>
@@ -129,8 +197,8 @@ const sendTrackedEmail = async (userId, { to, cc, bcc, subject, body, isHtml = f
 
   let message;
 
-  if (attachments.length > 0) {
-    // Build multipart/mixed MIME message with attachments
+  if (inlineAttachments.length > 0) {
+    // Build multipart/mixed MIME message with inline attachments (fallback when R2 not available)
     const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
     const headerLines = [
@@ -156,7 +224,7 @@ const sendTrackedEmail = async (userId, { to, cc, bcc, subject, body, isHtml = f
     ].join('\r\n');
 
     // Attachment parts
-    const attachmentParts = attachments.map(file => {
+    const attachmentParts = inlineAttachments.map(file => {
       const filename = file.originalname.replace(/"/g, '\\"');
       return [
         `--${boundary}`,
@@ -216,7 +284,8 @@ const sendTrackedEmail = async (userId, { to, cc, bcc, subject, body, isHtml = f
       subject,
       recipient: to,
       senderEmail,
-      pixelUrl: trackedEmail.pixelUrl
+      pixelUrl: trackedEmail.pixelUrl,
+      attachments: attachmentLinks
     }
   };
 };

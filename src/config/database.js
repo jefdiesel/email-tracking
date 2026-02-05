@@ -103,11 +103,56 @@ const initDatabase = async () => {
       )
     `);
 
+    // Attachments table (files stored in R2)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS attachments (
+        id TEXT PRIMARY KEY,
+        email_id TEXT NOT NULL REFERENCES tracked_emails(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL,
+        mimetype TEXT,
+        size INTEGER,
+        r2_key TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Attachment downloads table (tracking)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS attachment_downloads (
+        id TEXT PRIMARY KEY,
+        attachment_id TEXT NOT NULL REFERENCES attachments(id) ON DELETE CASCADE,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ip TEXT,
+        user_agent TEXT,
+        city TEXT,
+        region TEXT,
+        country TEXT,
+        country_code TEXT,
+        isp TEXT,
+        org TEXT,
+        timezone TEXT,
+        lat REAL,
+        lon REAL,
+        is_mobile BOOLEAN DEFAULT FALSE,
+        is_proxy BOOLEAN DEFAULT FALSE,
+        is_hosting BOOLEAN DEFAULT FALSE,
+        browser TEXT,
+        browser_version TEXT,
+        os TEXT,
+        os_version TEXT,
+        device_type TEXT,
+        is_bot BOOLEAN DEFAULT FALSE,
+        language TEXT
+      )
+    `);
+
     // Create indexes for performance
     await client.query(`CREATE INDEX IF NOT EXISTS idx_tracked_emails_user_id ON tracked_emails(user_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_email_opens_email_id ON email_opens(email_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token ON sessions(refresh_token)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_attachments_email_id ON attachments(email_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_attachment_downloads_attachment_id ON attachment_downloads(attachment_id)`);
 
     console.log('Database tables initialized');
   } finally {
