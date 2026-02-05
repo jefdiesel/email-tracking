@@ -131,10 +131,12 @@ router.post('/disconnect', authenticate, async (req, res) => {
 // POST /api/gmail/send - Send tracked email via Gmail
 router.post('/send', authenticate, apiRateLimit, upload.array('attachments', 5), validateGmailSend, async (req, res) => {
   try {
-    const { to, subject, body, isHtml } = req.body;
+    const { to, cc, bcc, subject, body, isHtml } = req.body;
 
     const result = await gmailService.sendTrackedEmail(req.user.id, {
       to,
+      cc,
+      bcc,
       subject,
       body,
       isHtml: isHtml === 'true' || isHtml === true,

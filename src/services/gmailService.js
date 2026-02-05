@@ -90,7 +90,7 @@ const getGmailProfile = async (userId) => {
   };
 };
 
-const sendTrackedEmail = async (userId, { to, subject, body, isHtml = false, attachments = [] }) => {
+const sendTrackedEmail = async (userId, { to, cc, bcc, subject, body, isHtml = false, attachments = [] }) => {
   const auth = await getAuthenticatedClient(userId);
   const gmail = google.gmail({ version: 'v1', auth });
   const oauth2 = google.oauth2({ version: 'v2', auth });
@@ -133,13 +133,18 @@ const sendTrackedEmail = async (userId, { to, subject, body, isHtml = false, att
     // Build multipart/mixed MIME message with attachments
     const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-    const headers = [
+    const headerLines = [
       `From: ${senderEmail}`,
-      `To: ${to}`,
+      `To: ${to}`
+    ];
+    if (cc) headerLines.push(`Cc: ${cc}`);
+    if (bcc) headerLines.push(`Bcc: ${bcc}`);
+    headerLines.push(
       `Subject: ${subject}`,
       'MIME-Version: 1.0',
       `Content-Type: multipart/mixed; boundary="${boundary}"`
-    ].join('\r\n');
+    );
+    const headers = headerLines.join('\r\n');
 
     // HTML body part
     const bodyPart = [
@@ -168,13 +173,17 @@ const sendTrackedEmail = async (userId, { to, subject, body, isHtml = false, att
     // Simple message without attachments (existing format)
     const messageParts = [
       `From: ${senderEmail}`,
-      `To: ${to}`,
+      `To: ${to}`
+    ];
+    if (cc) messageParts.push(`Cc: ${cc}`);
+    if (bcc) messageParts.push(`Bcc: ${bcc}`);
+    messageParts.push(
       `Subject: ${subject}`,
       'MIME-Version: 1.0',
       'Content-Type: text/html; charset=utf-8',
       '',
       emailBody
-    ];
+    );
 
     message = messageParts.join('\r\n');
   }

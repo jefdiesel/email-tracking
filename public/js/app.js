@@ -447,6 +447,8 @@ class EmailTracker {
   async handleSendEmail(e) {
     e.preventDefault();
     const to = document.getElementById('compose-to').value;
+    const cc = document.getElementById('compose-cc').value;
+    const bcc = document.getElementById('compose-bcc').value;
     const subject = document.getElementById('compose-subject').value;
     const body = document.getElementById('compose-body').value;
     const filesInput = document.getElementById('compose-attachments');
@@ -458,6 +460,8 @@ class EmailTracker {
     try {
       const formData = new FormData();
       formData.append('to', to);
+      formData.append('cc', cc);
+      formData.append('bcc', bcc);
       formData.append('subject', subject);
       formData.append('body', body);
 

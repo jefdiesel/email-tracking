@@ -107,13 +107,37 @@ const validateTrackingId = (req, res, next) => {
   next();
 };
 
+// Validate comma-separated email list
+const validateEmailList = (emailStr) => {
+  if (!emailStr || emailStr.trim().length === 0) return [];
+  const emails = emailStr.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0);
+  const invalid = emails.filter(e => !validateEmail(e));
+  return { emails, invalid };
+};
+
 // Validate Gmail send request
 const validateGmailSend = (req, res, next) => {
-  const { to, subject, body } = req.body;
+  const { to, cc, bcc, subject, body } = req.body;
   const errors = [];
 
-  if (!to || !validateEmail(to)) {
-    errors.push('Valid recipient email is required');
+  // Validate To (required, can be comma-separated)
+  const toResult = validateEmailList(to);
+  if (toResult.emails.length === 0) {
+    errors.push('At least one recipient email is required');
+  } else if (toResult.invalid.length > 0) {
+    errors.push(`Invalid recipient email(s): ${toResult.invalid.join(', ')}`);
+  }
+
+  // Validate CC (optional)
+  const ccResult = validateEmailList(cc || '');
+  if (ccResult.invalid.length > 0) {
+    errors.push(`Invalid CC email(s): ${ccResult.invalid.join(', ')}`);
+  }
+
+  // Validate BCC (optional)
+  const bccResult = validateEmailList(bcc || '');
+  if (bccResult.invalid.length > 0) {
+    errors.push(`Invalid BCC email(s): ${bccResult.invalid.join(', ')}`);
   }
 
   if (!subject || subject.trim().length === 0) {
@@ -128,7 +152,9 @@ const validateGmailSend = (req, res, next) => {
     return res.status(400).json({ success: false, errors });
   }
 
-  req.body.to = to.toLowerCase().trim();
+  req.body.to = toResult.emails.join(', ');
+  req.body.cc = ccResult.emails.join(', ');
+  req.body.bcc = bccResult.emails.join(', ');
   req.body.subject = sanitizeString(subject, 200);
   req.body.body = sanitizeString(body, 50000);
 
