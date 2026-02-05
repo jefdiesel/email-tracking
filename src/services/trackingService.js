@@ -143,8 +143,6 @@ const createTrackedEmail = async (userId, { subject, recipient, senderEmail }) =
 };
 
 const recordOpen = async (emailId, { ip, userAgent, referer, language }) => {
-  console.log('recordOpen called with IP:', ip);
-
   // Verify email exists (no user check - pixels work for anyone)
   const email = await dbGet('SELECT id FROM tracked_emails WHERE id = ?', [emailId]);
   if (!email) {
@@ -193,8 +191,6 @@ const recordOpen = async (emailId, { ip, userAgent, referer, language }) => {
     ip.startsWith('151.101.')    // Fastly CDN
   );
 
-  console.log('isLocalIP:', isLocalIP, 'isGoogleProxy:', isGoogleProxy);
-
   if (isGoogleProxy) {
     location.city = 'Gmail Proxy';
     location.country = 'Google Servers';
@@ -225,10 +221,8 @@ const recordOpen = async (emailId, { ip, userAgent, referer, language }) => {
     try {
       // Request all available fields from ip-api.com
       const geoUrl = `${config.GEO_API_URL}/${ip}?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,isp,org,mobile,proxy,hosting`;
-      console.log('Fetching geolocation from:', geoUrl);
       const response = await fetch(geoUrl, { signal: AbortSignal.timeout(3000) });
       const geo = await response.json();
-      console.log('Geolocation response:', geo);
       if (geo.status === 'success') {
         location = {
           city: geo.city || 'Unknown',
@@ -244,14 +238,11 @@ const recordOpen = async (emailId, { ip, userAgent, referer, language }) => {
           proxy: geo.proxy || false,
           hosting: geo.hosting || false
         };
-      } else {
-        console.log('Geolocation failed with status:', geo.status, geo.message);
       }
     } catch (err) {
       console.error('Geolocation error:', err.message);
     }
   } else {
-    console.log('Skipping geolocation for local IP');
     location.city = 'Local Network';
     location.country = 'Local';
   }
@@ -498,8 +489,6 @@ const getAttachmentsByEmail = async (emailId) => {
 };
 
 const recordDownload = async (attachmentId, { ip, userAgent, language }) => {
-  console.log('recordDownload called with IP:', ip);
-
   // Parse user agent
   const uaInfo = parseUserAgent(userAgent);
 
@@ -532,8 +521,6 @@ const recordDownload = async (attachmentId, { ip, userAgent, language }) => {
     ip.startsWith('146.75.') || ip.startsWith('151.101.')
   );
 
-  console.log('Download - isLocalIP:', isLocalIP, 'isGoogleProxy:', isGoogleProxy, 'isSecurityScanner:', isSecurityScanner);
-
   if (isGoogleProxy) {
     location.city = 'Gmail Proxy';
     location.country = 'Google Servers';
@@ -550,10 +537,8 @@ const recordDownload = async (attachmentId, { ip, userAgent, language }) => {
   } else if (!isLocalIP) {
     try {
       const geoUrl = `${config.GEO_API_URL}/${ip}?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,isp,org,mobile,proxy,hosting`;
-      console.log('Download - Fetching geolocation from:', geoUrl);
       const response = await fetch(geoUrl, { signal: AbortSignal.timeout(3000) });
       const geo = await response.json();
-      console.log('Download - Geolocation response:', geo);
       if (geo.status === 'success') {
         location = {
           city: geo.city || 'Unknown',
@@ -569,15 +554,10 @@ const recordDownload = async (attachmentId, { ip, userAgent, language }) => {
           proxy: geo.proxy || false,
           hosting: geo.hosting || false
         };
-        console.log('Download - Location set to:', location);
-      } else {
-        console.log('Download - Geolocation failed with status:', geo.status, geo.message);
       }
     } catch (err) {
       console.error('Geolocation error for download:', err.message);
     }
-  } else {
-    console.log('Download - Skipping geolocation for local IP');
   }
 
   const id = generateTrackingId();
