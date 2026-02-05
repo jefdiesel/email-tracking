@@ -109,7 +109,7 @@ const validateTrackingId = (req, res, next) => {
 
 // Validate comma-separated email list
 const validateEmailList = (emailStr) => {
-  if (!emailStr || emailStr.trim().length === 0) return [];
+  if (!emailStr || emailStr.trim().length === 0) return { emails: [], invalid: [] };
   const emails = emailStr.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0);
   const invalid = emails.filter(e => !validateEmail(e));
   return { emails, invalid };
