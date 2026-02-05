@@ -182,6 +182,8 @@ router.delete('/emails/:id', authenticate, apiRateLimit, validateTrackingId, asy
 
 // GET /api/track/download/:attachmentId - Tracked file download
 router.get('/download/:attachmentId', async (req, res) => {
+  console.log('Download route hit for:', req.params.attachmentId);
+  console.log('Request IP:', req.ip, 'CF-IP:', req.headers['cf-connecting-ip']);
   try {
     const { attachmentId } = req.params;
 
