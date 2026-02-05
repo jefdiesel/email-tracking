@@ -743,13 +743,29 @@ tbody tr:hover {
 }
 
 .attachment-chip {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   background: var(--gray-100);
   border: 1px solid var(--gray-300);
   padding: 0.25rem 0.625rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   color: var(--gray-700);
+}
+
+.remove-attachment {
+  background: none;
+  border: none;
+  color: var(--gray-500);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.remove-attachment:hover {
+  color: var(--danger);
 }
 
 /* Responsive */

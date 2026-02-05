@@ -7,6 +7,7 @@ class EmailTracker {
     this.user = JSON.parse(localStorage.getItem('user') || 'null');
     this.gmailConnected = false;
     this.currentPage = 1;
+    this.selectedFiles = []; // Accumulate files across selections
 
     this.init();
   }
@@ -478,25 +479,55 @@ class EmailTracker {
       sendBtn.disabled = false;
     }
 
+    // Clear any previous attachments
+    this.selectedFiles = [];
+    document.getElementById('attachment-list').innerHTML = '';
+
     this.showModal('compose-modal');
   }
 
   updateAttachmentList() {
     const input = document.getElementById('compose-attachments');
     const listEl = document.getElementById('attachment-list');
-    const files = input.files;
 
-    if (files.length === 0) {
+    // Add newly selected files to our accumulated list
+    for (const file of input.files) {
+      // Avoid duplicates by name
+      if (!this.selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+        this.selectedFiles.push(file);
+      }
+    }
+
+    // Clear the input so the same file can be re-selected if removed
+    input.value = '';
+
+    this.renderAttachmentList();
+  }
+
+  renderAttachmentList() {
+    const listEl = document.getElementById('attachment-list');
+
+    if (this.selectedFiles.length === 0) {
       listEl.innerHTML = '';
       return;
     }
 
-    listEl.innerHTML = Array.from(files).map(f => {
+    listEl.innerHTML = this.selectedFiles.map((f, idx) => {
       const size = f.size < 1024 * 1024
         ? (f.size / 1024).toFixed(1) + ' KB'
         : (f.size / (1024 * 1024)).toFixed(1) + ' MB';
-      return `<span class="attachment-chip">${this.escapeHtml(f.name)} (${size})</span>`;
+      return `<span class="attachment-chip">${this.escapeHtml(f.name)} (${size}) <button type="button" class="remove-attachment" data-idx="${idx}">&times;</button></span>`;
     }).join('');
+
+    // Add remove handlers
+    listEl.querySelectorAll('.remove-attachment').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const idx = parseInt(btn.dataset.idx);
+        this.selectedFiles.splice(idx, 1);
+        this.renderAttachmentList();
+      });
+    });
   }
 
   async handleSendEmail(e) {
@@ -506,7 +537,6 @@ class EmailTracker {
     const bcc = document.getElementById('compose-bcc').value;
     const subject = document.getElementById('compose-subject').value;
     const body = document.getElementById('compose-body').value;
-    const filesInput = document.getElementById('compose-attachments');
 
     const sendBtn = document.getElementById('send-email-btn');
     sendBtn.disabled = true;
@@ -520,7 +550,7 @@ class EmailTracker {
       formData.append('subject', subject);
       formData.append('body', body);
 
-      for (const file of filesInput.files) {
+      for (const file of this.selectedFiles) {
         formData.append('attachments', file);
       }
 
@@ -528,6 +558,7 @@ class EmailTracker {
       this.showNotification('Email sent successfully!', 'success');
       this.closeModals();
       document.getElementById('compose-form').reset();
+      this.selectedFiles = [];
       document.getElementById('attachment-list').innerHTML = '';
       await this.loadEmails();
       await this.loadStats();
