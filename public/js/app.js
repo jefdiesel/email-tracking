@@ -317,8 +317,10 @@ class EmailTracker {
                 ${att.downloads && att.downloads.length > 0 ? `
                   <div class="attachment-downloads">
                     ${att.downloads.map(dl => `
-                      <div class="download-item">
+                      <div class="download-item ${dl.device?.isBot || dl.location?.city?.includes('Scanner') ? 'scanner-item' : ''}">
                         <span class="download-ip">${dl.ip}</span>
+                        ${dl.device?.isBot || dl.location?.city?.includes('Scanner') ? '<span class="badge badge-warning">Scanner</span>' : ''}
+                        ${dl.location?.city?.includes('Proxy') ? '<span class="badge badge-info">Proxy</span>' : ''}
                         <span class="download-device">${dl.device?.browser || 'Unknown'} / ${dl.device?.os || 'Unknown'}</span>
                         <span class="download-location">${dl.location?.city || 'Unknown'}, ${dl.location?.country || 'Unknown'}</span>
                         <span class="download-time">${this.formatDate(dl.timestamp)}</span>

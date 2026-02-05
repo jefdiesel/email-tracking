@@ -721,6 +721,19 @@ tbody tr:hover {
   font-size: 0.75rem;
 }
 
+.scanner-item {
+  opacity: 0.6;
+  background: var(--gray-100);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  margin: 0.25rem 0;
+}
+
+.download-item .badge {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.4rem;
+}
+
 .proxy-note {
   display: block;
   font-size: 0.7rem;

@@ -179,26 +179,48 @@ const recordOpen = async (emailId, { ip, userAgent, referer, language }) => {
   const isYahooProxy = ip && ip.startsWith('98.137.');
   const isMicrosoftProxy = ip && (ip.startsWith('40.') || ip.startsWith('52.') || ip.startsWith('104.47.'));
 
+  // Detect email security scanners (AWS, Proofpoint, Mimecast, etc.)
+  const isSecurityScanner = ip && (
+    ip.startsWith('44.') ||      // AWS (common for security scanners)
+    ip.startsWith('54.') ||      // AWS
+    ip.startsWith('52.') ||      // AWS
+    ip.startsWith('34.') ||      // Google Cloud / AWS
+    ip.startsWith('35.') ||      // Google Cloud
+    ip.startsWith('13.') ||      // AWS
+    ip.startsWith('18.') ||      // AWS
+    ip.startsWith('3.') ||       // AWS
+    ip.startsWith('146.75.') ||  // Fastly CDN
+    ip.startsWith('151.101.')    // Fastly CDN
+  );
+
   console.log('isLocalIP:', isLocalIP, 'isGoogleProxy:', isGoogleProxy);
 
   if (isGoogleProxy) {
     location.city = 'Gmail Proxy';
     location.country = 'Google Servers';
     location.isp = 'Google LLC';
-    location.isProxy = true;
+    location.proxy = true;
     location.hosting = true;
   } else if (isYahooProxy) {
     location.city = 'Yahoo Mail Proxy';
     location.country = 'Yahoo Servers';
     location.isp = 'Yahoo';
-    location.isProxy = true;
+    location.proxy = true;
     location.hosting = true;
   } else if (isMicrosoftProxy) {
     location.city = 'Outlook Proxy';
     location.country = 'Microsoft Servers';
     location.isp = 'Microsoft';
-    location.isProxy = true;
+    location.proxy = true;
     location.hosting = true;
+  } else if (isSecurityScanner) {
+    location.city = 'Security Scanner';
+    location.country = 'Cloud Server';
+    location.isp = 'Email Security';
+    location.proxy = true;
+    location.hosting = true;
+    // Mark as bot since it's automated
+    uaInfo.isBot = true;
   } else if (!isLocalIP) {
     try {
       // Request all available fields from ip-api.com
@@ -493,7 +515,29 @@ const recordDownload = async (attachmentId, { ip, userAgent, language }) => {
     ip.startsWith('10.') ||
     ip.startsWith('172.');
 
-  if (!isLocalIP) {
+  // Detect known proxies and scanners
+  const isGoogleProxy = ip && (ip.startsWith('74.125.') || ip.startsWith('66.249.') || ip.startsWith('209.85.'));
+  const isSecurityScanner = ip && (
+    ip.startsWith('44.') || ip.startsWith('54.') || ip.startsWith('52.') ||
+    ip.startsWith('34.') || ip.startsWith('35.') || ip.startsWith('13.') ||
+    ip.startsWith('18.') || ip.startsWith('3.') ||
+    ip.startsWith('146.75.') || ip.startsWith('151.101.')
+  );
+
+  if (isGoogleProxy) {
+    location.city = 'Gmail Proxy';
+    location.country = 'Google Servers';
+    location.isp = 'Google LLC';
+    location.proxy = true;
+    location.hosting = true;
+  } else if (isSecurityScanner) {
+    location.city = 'Security Scanner';
+    location.country = 'Cloud Server';
+    location.isp = 'Email Security';
+    location.proxy = true;
+    location.hosting = true;
+    uaInfo.isBot = true;
+  } else if (!isLocalIP) {
     try {
       const geoUrl = `${config.GEO_API_URL}/${ip}?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,isp,org,mobile,proxy,hosting`;
       const response = await fetch(geoUrl, { signal: AbortSignal.timeout(3000) });
