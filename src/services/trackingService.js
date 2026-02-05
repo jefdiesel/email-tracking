@@ -6,7 +6,7 @@ const generateTrackingId = () => crypto.randomBytes(16).toString('hex');
 
 // Parse user agent string
 const parseUserAgent = (ua) => {
-  if (!ua) return { browser: 'Unknown', browserVersion: '', os: 'Unknown', osVersion: '', deviceType: 'Unknown', isBot: false };
+  if (!ua) return { browser: 'Unknown', browserVersion: '', os: 'Unknown', osVersion: '', deviceType: 'Unknown', isBot: false, isProxy: false, proxyName: null };
 
   const result = {
     browser: 'Unknown',
@@ -14,8 +14,35 @@ const parseUserAgent = (ua) => {
     os: 'Unknown',
     osVersion: '',
     deviceType: 'Desktop',
-    isBot: false
+    isBot: false,
+    isProxy: false,
+    proxyName: null
   };
+
+  // Email proxy detection (these mask the real user's info)
+  if (/GoogleImageProxy|ggpht\.com/i.test(ua)) {
+    result.isProxy = true;
+    result.proxyName = 'Gmail Proxy';
+    result.browser = 'Gmail Proxy';
+    result.os = 'Google Servers';
+    result.deviceType = 'Email Proxy';
+    return result;
+  }
+  if (/YahooMailProxy/i.test(ua)) {
+    result.isProxy = true;
+    result.proxyName = 'Yahoo Mail Proxy';
+    result.browser = 'Yahoo Mail Proxy';
+    result.os = 'Yahoo Servers';
+    result.deviceType = 'Email Proxy';
+    return result;
+  }
+  if (/Outlook-iOS|Microsoft Outlook/i.test(ua)) {
+    result.isProxy = true;
+    result.proxyName = 'Outlook Proxy';
+    result.browser = 'Outlook';
+    result.deviceType = 'Email Proxy';
+    return result;
+  }
 
   // Bot detection
   const botPatterns = /bot|crawler|spider|crawling|facebookexternalhit|slurp|googlebot|bingbot|yandex|baidu|duckduck|sogou|exabot|ia_archiver|semrush|ahref|mj12bot|dotbot|petalbot|bytespider/i;
@@ -147,9 +174,32 @@ const recordOpen = async (emailId, { ip, userAgent, referer, language }) => {
     ip.startsWith('172.30.') ||
     ip.startsWith('172.31.');
 
-  console.log('isLocalIP:', isLocalIP);
+  // Detect known email proxy IPs
+  const isGoogleProxy = ip && (ip.startsWith('74.125.') || ip.startsWith('66.249.') || ip.startsWith('209.85.'));
+  const isYahooProxy = ip && ip.startsWith('98.137.');
+  const isMicrosoftProxy = ip && (ip.startsWith('40.') || ip.startsWith('52.') || ip.startsWith('104.47.'));
 
-  if (!isLocalIP) {
+  console.log('isLocalIP:', isLocalIP, 'isGoogleProxy:', isGoogleProxy);
+
+  if (isGoogleProxy) {
+    location.city = 'Gmail Proxy';
+    location.country = 'Google Servers';
+    location.isp = 'Google LLC';
+    location.isProxy = true;
+    location.hosting = true;
+  } else if (isYahooProxy) {
+    location.city = 'Yahoo Mail Proxy';
+    location.country = 'Yahoo Servers';
+    location.isp = 'Yahoo';
+    location.isProxy = true;
+    location.hosting = true;
+  } else if (isMicrosoftProxy) {
+    location.city = 'Outlook Proxy';
+    location.country = 'Microsoft Servers';
+    location.isp = 'Microsoft';
+    location.isProxy = true;
+    location.hosting = true;
+  } else if (!isLocalIP) {
     try {
       // Request all available fields from ip-api.com
       const geoUrl = `${config.GEO_API_URL}/${ip}?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,isp,org,mobile,proxy,hosting`;

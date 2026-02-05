@@ -348,10 +348,15 @@ class EmailTracker {
                   ${reader.location.timezone ? `· ${reader.location.timezone}` : ''}
                 </div>
                 <div class="reader-device">
-                  <strong>Device:</strong> ${reader.device?.deviceType || 'Unknown'}
-                  ${reader.location?.isMobile ? '(Mobile Network)' : ''}
-                  · ${reader.device?.browser || 'Unknown'}${reader.device?.browserVersion ? ' ' + reader.device.browserVersion : ''}
-                  · ${reader.device?.os || 'Unknown'}${reader.device?.osVersion ? ' ' + reader.device.osVersion : ''}
+                  ${reader.device?.isProxy || reader.location?.city?.includes('Proxy') ? `
+                    <strong>Device:</strong> <em>Hidden by ${reader.location?.city || 'Email Proxy'}</em>
+                    <span class="proxy-note">(Email providers hide real device/location info)</span>
+                  ` : `
+                    <strong>Device:</strong> ${reader.device?.deviceType || 'Unknown'}
+                    ${reader.location?.isMobile ? '(Mobile Network)' : ''}
+                    · ${reader.device?.browser || 'Unknown'}${reader.device?.browserVersion ? ' ' + reader.device.browserVersion : ''}
+                    · ${reader.device?.os || 'Unknown'}${reader.device?.osVersion ? ' ' + reader.device.osVersion : ''}
+                  `}
                 </div>
                 <div class="reader-network">
                   <strong>Network:</strong> ${reader.location.isp !== 'Unknown' ? reader.location.isp : ''}

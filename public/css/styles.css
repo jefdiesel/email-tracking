@@ -721,6 +721,14 @@ tbody tr:hover {
   font-size: 0.75rem;
 }
 
+.proxy-note {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--gray-400);
+  font-style: italic;
+  margin-top: 0.25rem;
+}
+
 /* Attachments */
 .form-group input[type="file"] {
   padding: 0.5rem;
