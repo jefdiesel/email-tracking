@@ -90,7 +90,7 @@ const getGmailProfile = async (userId) => {
   };
 };
 
-const sendTrackedEmail = async (userId, { to, subject, body, isHtml = false }) => {
+const sendTrackedEmail = async (userId, { to, subject, body, isHtml = false, attachments = [] }) => {
   const auth = await getAuthenticatedClient(userId);
   const gmail = google.gmail({ version: 'v1', auth });
   const oauth2 = google.oauth2({ version: 'v2', auth });
@@ -127,18 +127,58 @@ const sendTrackedEmail = async (userId, { to, subject, body, isHtml = false }) =
     `;
   }
 
-  // Create email message
-  const messageParts = [
-    `From: ${senderEmail}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=utf-8',
-    '',
-    emailBody
-  ];
+  let message;
 
-  const message = messageParts.join('\r\n');
+  if (attachments.length > 0) {
+    // Build multipart/mixed MIME message with attachments
+    const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+    const headers = [
+      `From: ${senderEmail}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/mixed; boundary="${boundary}"`
+    ].join('\r\n');
+
+    // HTML body part
+    const bodyPart = [
+      `--${boundary}`,
+      'Content-Type: text/html; charset=utf-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      Buffer.from(emailBody).toString('base64')
+    ].join('\r\n');
+
+    // Attachment parts
+    const attachmentParts = attachments.map(file => {
+      const filename = file.originalname.replace(/"/g, '\\"');
+      return [
+        `--${boundary}`,
+        `Content-Type: ${file.mimetype}`,
+        `Content-Disposition: attachment; filename="${filename}"`,
+        'Content-Transfer-Encoding: base64',
+        '',
+        file.buffer.toString('base64')
+      ].join('\r\n');
+    });
+
+    message = [headers, '', bodyPart, ...attachmentParts, `--${boundary}--`].join('\r\n');
+  } else {
+    // Simple message without attachments (existing format)
+    const messageParts = [
+      `From: ${senderEmail}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=utf-8',
+      '',
+      emailBody
+    ];
+
+    message = messageParts.join('\r\n');
+  }
+
   const encodedMessage = Buffer.from(message)
     .toString('base64')
     .replace(/\+/g, '-')

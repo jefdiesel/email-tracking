@@ -635,6 +635,29 @@ tbody tr:hover {
   margin-top: 0.5rem;
 }
 
+/* Attachments */
+.form-group input[type="file"] {
+  padding: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.attachment-chip {
+  display: inline-block;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-300);
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  color: var(--gray-700);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .header {

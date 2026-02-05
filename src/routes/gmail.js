@@ -1,10 +1,20 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const gmailService = require('../services/gmailService');
 const { authenticate } = require('../middleware/auth');
 const { validateGmailSend } = require('../middleware/validate');
 const { apiRateLimit } = require('../middleware/rateLimit');
 const { config } = require('../config/env');
+
+// Configure multer for file attachments (memory storage, no disk writes)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    files: 5,
+    fileSize: 25 * 1024 * 1024 // 25MB per file
+  }
+});
 
 // GET /api/gmail/auth - Get Gmail OAuth URL
 router.get('/auth', authenticate, (req, res) => {
@@ -119,7 +129,7 @@ router.post('/disconnect', authenticate, async (req, res) => {
 });
 
 // POST /api/gmail/send - Send tracked email via Gmail
-router.post('/send', authenticate, apiRateLimit, validateGmailSend, async (req, res) => {
+router.post('/send', authenticate, apiRateLimit, upload.array('attachments', 5), validateGmailSend, async (req, res) => {
   try {
     const { to, subject, body, isHtml } = req.body;
 
@@ -127,7 +137,8 @@ router.post('/send', authenticate, apiRateLimit, validateGmailSend, async (req, 
       to,
       subject,
       body,
-      isHtml: isHtml === true
+      isHtml: isHtml === 'true' || isHtml === true,
+      attachments: req.files || []
     });
 
     res.json({

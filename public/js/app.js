@@ -42,6 +42,7 @@ class EmailTracker {
     // Compose email
     document.getElementById('compose-email-btn').addEventListener('click', () => this.showComposeModal());
     document.getElementById('compose-form').addEventListener('submit', (e) => this.handleSendEmail(e));
+    document.getElementById('compose-attachments').addEventListener('change', (e) => this.updateAttachmentList(e));
 
     // Gmail
     document.getElementById('gmail-connect-btn').addEventListener('click', () => this.handleGmailConnect());
@@ -425,21 +426,50 @@ class EmailTracker {
     this.showModal('compose-modal');
   }
 
+  updateAttachmentList() {
+    const input = document.getElementById('compose-attachments');
+    const listEl = document.getElementById('attachment-list');
+    const files = input.files;
+
+    if (files.length === 0) {
+      listEl.innerHTML = '';
+      return;
+    }
+
+    listEl.innerHTML = Array.from(files).map(f => {
+      const size = f.size < 1024 * 1024
+        ? (f.size / 1024).toFixed(1) + ' KB'
+        : (f.size / (1024 * 1024)).toFixed(1) + ' MB';
+      return `<span class="attachment-chip">${this.escapeHtml(f.name)} (${size})</span>`;
+    }).join('');
+  }
+
   async handleSendEmail(e) {
     e.preventDefault();
     const to = document.getElementById('compose-to').value;
     const subject = document.getElementById('compose-subject').value;
     const body = document.getElementById('compose-body').value;
+    const filesInput = document.getElementById('compose-attachments');
 
     const sendBtn = document.getElementById('send-email-btn');
     sendBtn.disabled = true;
     sendBtn.textContent = 'Sending...';
 
     try {
-      await this.api('/api/gmail/send', 'POST', { to, subject, body });
+      const formData = new FormData();
+      formData.append('to', to);
+      formData.append('subject', subject);
+      formData.append('body', body);
+
+      for (const file of filesInput.files) {
+        formData.append('attachments', file);
+      }
+
+      await this.api('/api/gmail/send', 'POST', formData);
       this.showNotification('Email sent successfully!', 'success');
       this.closeModals();
       document.getElementById('compose-form').reset();
+      document.getElementById('attachment-list').innerHTML = '';
       await this.loadEmails();
       await this.loadStats();
     } catch (err) {
@@ -463,14 +493,19 @@ class EmailTracker {
 
   // Utility Methods
   async api(url, method, body) {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = {};
+    const isFormData = body instanceof FormData;
+
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
     if (this.accessToken) {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
     }
 
     const options = { method, headers };
     if (body) {
-      options.body = JSON.stringify(body);
+      options.body = isFormData ? body : JSON.stringify(body);
     }
 
     const res = await fetch(url, options);

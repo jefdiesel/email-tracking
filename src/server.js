@@ -73,12 +73,23 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Disable caching for development
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 // Serve static files
-app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(__dirname, '../public'), { etag: false, maxAge: 0 }));
 
 // SPA fallback - serve index.html for all non-API routes
 app.use((req, res, next) => {
   if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.sendFile(path.join(__dirname, '../public/index.html'));
   } else if (req.path.startsWith('/api/')) {
     res.status(404).json({ success: false, error: 'Not found' });
