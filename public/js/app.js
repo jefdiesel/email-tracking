@@ -677,18 +677,22 @@ class EmailTracker {
 
   formatDate(dateString) {
     if (!dateString) return '-';
+    console.log('formatDate input:', dateString);
     // Handle PostgreSQL timestamp format (space instead of T) and ensure UTC
     let normalized = dateString.replace(' ', 'T');
     if (!normalized.endsWith('Z') && !normalized.includes('+') && !normalized.includes('-', 10)) {
       normalized += 'Z';
     }
+    console.log('normalized:', normalized);
     const utcDate = new Date(normalized);
+    console.log('utcDate:', utcDate.toISOString());
 
     // Check for invalid date
     if (isNaN(utcDate.getTime())) return dateString;
 
     // Manually convert to EST (UTC-5)
     const estDate = new Date(utcDate.getTime() - (5 * 60 * 60 * 1000));
+    console.log('estDate:', estDate.toISOString());
 
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const month = months[estDate.getUTCMonth()];
@@ -698,7 +702,9 @@ class EmailTracker {
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12 || 12;
 
-    return `${month} ${day}, ${hours}:${minutes} ${ampm}`;
+    const result = `${month} ${day}, ${hours}:${minutes} ${ampm}`;
+    console.log('result:', result);
+    return result;
   }
 
   escapeHtml(text) {
