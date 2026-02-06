@@ -682,20 +682,23 @@ class EmailTracker {
     if (!normalized.endsWith('Z') && !normalized.includes('+') && !normalized.includes('-', 10)) {
       normalized += 'Z';
     }
-    const date = new Date(normalized);
+    const utcDate = new Date(normalized);
 
     // Check for invalid date
-    if (isNaN(date.getTime())) return dateString;
+    if (isNaN(utcDate.getTime())) return dateString;
 
-    // Format in EST
-    return date.toLocaleString('en-US', {
-      timeZone: 'America/New_York',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
+    // Manually convert to EST (UTC-5)
+    const estDate = new Date(utcDate.getTime() - (5 * 60 * 60 * 1000));
+
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const month = months[estDate.getUTCMonth()];
+    const day = estDate.getUTCDate();
+    let hours = estDate.getUTCHours();
+    const minutes = estDate.getUTCMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+
+    return `${month} ${day}, ${hours}:${minutes} ${ampm}`;
   }
 
   escapeHtml(text) {
