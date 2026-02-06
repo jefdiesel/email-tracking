@@ -13,6 +13,7 @@ class EmailTracker {
   }
 
   async init() {
+    this.initTheme();
     this.bindEvents();
     this.handleUrlParams();
 
@@ -23,7 +24,25 @@ class EmailTracker {
     }
   }
 
+  initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'bright';
+    this.setTheme(savedTheme);
+  }
+
+  setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.theme === theme);
+    });
+  }
+
   bindEvents() {
+    // Theme switching
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+      btn.addEventListener('click', () => this.setTheme(btn.dataset.theme));
+    });
+
     // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
