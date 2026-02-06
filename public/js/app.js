@@ -677,24 +677,17 @@ class EmailTracker {
 
   formatDate(dateString) {
     if (!dateString) return '-';
-    // Handle PostgreSQL timestamp format (space instead of T) and ensure UTC
-    let normalized = dateString.replace(' ', 'T');
-    if (!normalized.endsWith('Z') && !normalized.includes('+') && !normalized.includes('-', 10)) {
-      normalized += 'Z';
-    }
-    const utcDate = new Date(normalized);
+    const date = new Date(dateString);
 
     // Check for invalid date
-    if (isNaN(utcDate.getTime())) return dateString;
+    if (isNaN(date.getTime())) return dateString;
 
-    // Convert to EST (UTC-5)
-    const estDate = new Date(utcDate.getTime() - (5 * 60 * 60 * 1000));
-
+    // API returns timestamps already adjusted - just format in local timezone
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const month = months[estDate.getUTCMonth()];
-    const day = estDate.getUTCDate();
-    let hours = estDate.getUTCHours();
-    const minutes = estDate.getUTCMinutes().toString().padStart(2, '0');
+    const month = months[date.getMonth()];
+    const day = date.getDate();
+    let hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12 || 12;
 
