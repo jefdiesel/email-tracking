@@ -687,18 +687,15 @@ class EmailTracker {
     // Check for invalid date
     if (isNaN(date.getTime())) return dateString;
 
-    const now = new Date();
-    const diff = now - date;
-
-    // Handle future dates (shouldn't happen, but just in case)
-    if (diff < 0) return date.toLocaleString();
-
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
-    if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
-    if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
-
-    return date.toLocaleDateString();
+    // Format in EST
+    return date.toLocaleString('en-US', {
+      timeZone: 'America/New_York',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
   }
 
   escapeHtml(text) {
