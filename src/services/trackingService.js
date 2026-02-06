@@ -4,6 +4,20 @@ const { dbRun, dbGet, dbAll } = require('../config/database');
 
 const generateTrackingId = () => crypto.randomBytes(16).toString('hex');
 
+// Get timestamp in EST for database storage
+const getESTTimestamp = () => {
+  return new Date().toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).replace(/(\d+)\/(\d+)\/(\d+),\s/, '$3-$1-$2 ');
+};
+
 // Parse user agent string
 const parseUserAgent = (ua) => {
   if (!ua) return { browser: 'Unknown', browserVersion: '', os: 'Unknown', osVersion: '', deviceType: 'Unknown', isBot: false, isProxy: false, proxyName: null };
@@ -120,7 +134,7 @@ const TRACKING_PIXEL = Buffer.from(
 
 const createTrackedEmail = async (userId, { subject, recipient, senderEmail }) => {
   const id = generateTrackingId();
-  const createdAt = new Date().toISOString();
+  const createdAt = getESTTimestamp();
 
   await dbRun(
     `INSERT INTO tracked_emails (id, user_id, subject, recipient, sender_email, created_at)
@@ -248,7 +262,7 @@ const recordOpen = async (emailId, { ip, userAgent, referer, language }) => {
   }
 
   const id = generateTrackingId();
-  const timestamp = new Date().toISOString();
+  const timestamp = getESTTimestamp();
 
   await dbRun(
     `INSERT INTO email_opens (
@@ -561,7 +575,7 @@ const recordDownload = async (attachmentId, { ip, userAgent, language }) => {
   }
 
   const id = generateTrackingId();
-  const timestamp = new Date().toISOString();
+  const timestamp = getESTTimestamp();
 
   await dbRun(
     `INSERT INTO attachment_downloads (
