@@ -676,7 +676,14 @@ class EmailTracker {
   }
 
   formatDate(dateString) {
-    const date = new Date(dateString);
+    if (!dateString) return '-';
+    // Handle PostgreSQL timestamp format (space instead of T)
+    const normalized = dateString.replace(' ', 'T');
+    const date = new Date(normalized);
+
+    // Check for invalid date
+    if (isNaN(date.getTime())) return dateString;
+
     const now = new Date();
     const diff = now - date;
 
