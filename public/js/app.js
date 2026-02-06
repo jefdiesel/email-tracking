@@ -677,8 +677,11 @@ class EmailTracker {
 
   formatDate(dateString) {
     if (!dateString) return '-';
-    // Handle PostgreSQL timestamp format (space instead of T)
-    const normalized = dateString.replace(' ', 'T');
+    // Handle PostgreSQL timestamp format (space instead of T) and ensure UTC
+    let normalized = dateString.replace(' ', 'T');
+    if (!normalized.endsWith('Z') && !normalized.includes('+') && !normalized.includes('-', 10)) {
+      normalized += 'Z';
+    }
     const date = new Date(normalized);
 
     // Check for invalid date
@@ -686,6 +689,9 @@ class EmailTracker {
 
     const now = new Date();
     const diff = now - date;
+
+    // Handle future dates (shouldn't happen, but just in case)
+    if (diff < 0) return date.toLocaleString();
 
     if (diff < 60000) return 'Just now';
     if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
